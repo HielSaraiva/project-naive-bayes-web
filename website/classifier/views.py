@@ -1,36 +1,37 @@
-from django.shortcuts import render, redirect
+import base64
+from django.shortcuts import render
 from django.contrib import messages
 from .utils import predictor
 
-
 def index(request):
-    """Página inicial com formulário de upload"""
-    return render(request, 'classifier/index.html')
-
-
-def predict(request):
-    """Processa a imagem e retorna a predição"""
+    """Lida com a exibição inicial e o processamento na mesma página"""
+    # INICIALIZAÇÃO: Garante que as variáveis existam mesmo no método GET
+    prediction_result = None
+    image_base64 = None
+    
     if request.method == 'POST':
         if 'image' not in request.FILES:
             messages.error(request, 'Nenhuma imagem foi enviada.')
-            return redirect('classifier:index')
-
-        image_file = request.FILES['image']
-
-        if not image_file.content_type.startswith('image/'):
-            messages.error(
-                request, 'O arquivo enviado não é uma imagem válida.')
-            return redirect('classifier:index')
-
-        try:
-            result = predictor.predict(image_file)
-
-            return render(request, 'classifier/result.html', {
-                'prediction': result
-            })
-
-        except Exception as e:
-            messages.error(request, f'Erro ao processar a imagem: {str(e)}')
-            return redirect('classifier:index')
-
-    return redirect('classifier:index')
+        else:
+            image_file = request.FILES['image']
+            
+            if not image_file.content_type.startswith('image/'):
+                messages.error(request, 'O arquivo enviado não é uma imagem válida.')
+            else:
+                try:
+                    # 1. Executa a predição
+                    prediction_result = predictor.predict(image_file)
+                    
+                    # 2. Converte a imagem para Base64 para que ela continue aparecendo na tela
+                    image_file.seek(0)
+                    encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
+                    image_base64 = f"data:{image_file.content_type};base64,{encoded_string}"
+                    
+                except Exception as e:
+                    messages.error(request, f'Erro ao processar a imagem: {str(e)}')
+    
+    # Ao usar 'prediction': prediction_result, o Django não dará mais erro de variável indefinida
+    return render(request, 'classifier/index.html', {
+        'prediction': prediction_result,
+        'image_base64': image_base64
+    })
