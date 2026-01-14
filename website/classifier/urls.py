@@ -5,5 +5,4 @@ app_name = 'classifier'
 
 urlpatterns = [
     path('', views.index, name='index'),
-    path('predict/', views.predict, name='predict'),
 ]

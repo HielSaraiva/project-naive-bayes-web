@@ -4,28 +4,136 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Classificador de Acidentes</title>
+    
     {% load static %}
-    <link rel="icon" type="image/png" href="{% static 'classifier/images/logo.png' %}">
+    
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+
     <link rel="stylesheet" href="{% static 'classifier/css/index.css' %}">
 </head>
 <body>
-    <div class="container">
-        <h1>Classificador de Acidentes de Trânsito</h1>
-        <p class="subtitle">Envie uma imagem para análise</p>
-        
-        {% if messages %}
-        <div class="messages">
-            {% for message in messages %}
-                <div class="error">{{ message }}</div>
-            {% endfor %}
+    <div class="main-content">
+        <div class="titulo-container">
+            <h1>Sistema de Classificação de Acidentes de Trânsito</h1>
         </div>
-        {% endif %}
-        
-        <form method="post" action="{% url 'classifier:predict' %}" enctype="multipart/form-data">
-            {% csrf_token %}
-            <input type="file" name="image" accept="image/*" required>
-            <button type="submit">Prever</button>
-        </form>
+        <div class="form-container">
+            <h3>Análise de Acidente</h3>
+             <p>
+                Selecione uma imagem para saber se trata-se de um <strong>acidente grave</strong>, <strong>moderado</strong> ou se <strong>não é um acidente</strong>.
+            </p>
+
+            {% if messages %}
+            <div class="messages">
+                {% for message in messages %}
+                    <div class="error">{{ message }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <form method="post" action="{% url 'classifier:index' %}" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="grid-layout">
+                    <div class="imagem-container">
+                        <input type="file" name="image" id="fileInput" accept="image/*" style="display: none;">
+                        <label for="fileInput" id="labelArea" class="upload-placeholder"
+                            style="{% if image_base64 %}display: none;{% endif %}">
+                            <i class="bi bi-image" style="font-size: 3rem; color: #ccc;"></i>
+                            <p>Clique para selecionar a imagem</p>
+                        </label>
+                        <img id="previewImage" src="{% if image_base64 %}{{ image_base64 }}{% endif %}" 
+                            alt="Prévia" 
+                            style="{% if image_base64 %}display: block;{% else %}display: none;{% endif %}">
+                    </div>
+                   
+
+                    <div class="resultado-container">
+                        <h4>Resultado da Previsão</h4>
+                        <ul class="lista-legenda">
+                            <li><span class="dot grave"></span> <strong>Grave </strong> </li>
+                            <li><span class="dot moderado"></span> <strong>Moderado </strong></li>
+                            <li><span class="dot normal"></span> <strong>Não é acidente </strong> </li>
+                        </ul>
+                        <div id="predictionOutput" class="result-box 
+                            {% if prediction == 'Acidente de trânsito grave' %}res-grave
+                            {% elif prediction == 'Acidente de trânsito moderado' %}res-moderado
+                            {% elif prediction == 'Não é acidente' %}res-nenhum{% endif %}">
+                            
+                            <h3>
+                                {% if prediction == 'Acidente de trânsito grave' %}
+                                    🚨 Acidente Grave
+                                {% elif prediction == 'Acidente de trânsito moderado' %}
+                                    ⚠️ Acidente Moderado
+                                {% elif prediction == 'Não é acidente' %}
+                                    ✅ Não é acidente
+                                {% else %}
+                                    Aguardando análise...
+                                {% endif %}
+                            </h3>
+                        </div>
+                        <div class="form-content">
+                            <button type="submit" class="btn btn-primary w-100">Prever</button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
     </div>
+
+  <script>
+    // Seleção dos elementos do DOM
+    const fileInput = document.getElementById('fileInput');
+    const previewImage = document.getElementById('previewImage');
+    const labelArea = document.getElementById('labelArea');
+    const output = document.getElementById('predictionOutput');
+
+    // Evento disparado quando o usuário seleciona uma imagem
+    fileInput.addEventListener('change', function() {
+        const file = this.files[0]; // Captura o arquivo selecionado [cite: 62]
+
+        // 1. RESET DE INTERFACE: Limpa resultados e cores de previsões anteriores
+        if (output) {
+            output.innerHTML = "<h3>Aguardando análise...</h3>"; // Volta ao texto padrão [cite: 65]
+            output.classList.remove('res-grave', 'res-moderado', 'res-nenhum'); // Remove estilos de cores
+        }
+
+        // 2. PRÉ-VISUALIZAÇÃO: Carrega a imagem no navegador antes de enviar ao servidor
+        if (file) {
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                // Define o conteúdo da imagem com o arquivo lido
+                previewImage.src = e.target.result;
+                previewImage.style.display = 'block';
+                
+                // Esconde a área de texto/ícone (placeholder) 
+                if (labelArea) {
+                    labelArea.style.display = 'none';
+                }
+            }
+            
+            // Lê o arquivo como uma URL de dados (Base64) [cite: 24]
+            reader.readAsDataURL(file);
+        }
+    });
+
+    // 3. FACILIDADE DE USO: Permite trocar a imagem clicando diretamente na prévia exibida
+    previewImage.addEventListener('click', function() {
+        fileInput.click();
+    });
+
+    // 4. FEEDBACK DE ENVIO: (Opcional) Altera o botão ao clicar em prever
+    const form = document.querySelector('form');
+    form.addEventListener('submit', function() {
+        const btn = document.querySelector('.btn-primary');
+        if (btn) {
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processando...';
+            btn.disabled = true; // Evita múltiplos envios [cite: 63, 64]
+        }
+    });
+</script>
 </body>
 </html>
